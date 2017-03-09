@@ -1,7 +1,7 @@
 package co.tjcelaya.sigfig_test.spatialindex
 
+import co.tjcelaya.sigfig_test.spatialindex.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException}
 import com.github.mdr.ascii.graph.Graph
-import sun.util.logging.resources.logging
 
 /**
   * Created by tj on 3/7/17.
@@ -9,162 +9,126 @@ import sun.util.logging.resources.logging
 
 
 object KdNode {
-  def apply(coordinate: Coordinate) = LeafKdNode(coordinate)
-
-  def apply(xs: Int*) = LeafKdNode(SeqCoordinate(xs: _*))
-
   var logging = false
+
+  def apply(coordinate: Coordinate[Int], axis: Int) = LeafKdNode[Int](coordinate, axis)
+
+  def apply(axis: Int, xs: Int*) = LeafKdNode(SeqCoordinate(xs: _*), axis)
 }
 
-sealed trait KdNode {
-  val coordinates: Coordinate
+sealed trait KdNode[V] {
+  type TypedKdNode = KdNode[V]
+  type TypedCoordinate = Coordinate[V]
+  val coordinates: TypedCoordinate
   val axis: Int
 
-  def maybePrev: Option[KdNode] = this match {
+  def maybePrev: Option[TypedKdNode] = this match {
     case LesserKdNode(_, _, p) => Some(p)
     case BalancedKdNode(_, _, p, _) => Some(p)
     case _ => None
   }
 
-  def maybeNext: Option[KdNode] = this match {
+  def setPrev(n: TypedKdNode): TypedKdNode = this match {
+    case LeafKdNode(lC, lA) => LesserKdNode(lC, lA, n)
+    case LesserKdNode(lC, lA, _) => LesserKdNode(lC, lA, n)
+    case GreaterKdNode(gC, gA, gN) => BalancedKdNode(gC, gA, n, gN)
+    case BalancedKdNode(bC, bA, _, bN) => BalancedKdNode(bC, bA, n, bN)
+    case _ => throw InvalidKdSetException(this, n, "prev")
+  }
+
+  def dropPrev: TypedKdNode = this match {
+    case LesserKdNode(lC, lA, _) => LeafKdNode(lC, lA)
+    case BalancedKdNode(bC, bA, _, bN) => GreaterKdNode(bC, bA, bN)
+    case _ => throw InvalidKdDropException(this, "prev")
+  }
+
+  def maybeNext: Option[KdNode[V]] = this match {
     case GreaterKdNode(_, _, n) => Some(n)
     case BalancedKdNode(_, _, _, n) => Some(n)
     case _ => None
   }
 
-  def insertAtDepth(n: LeafKdNode, depth: Int): KdNode = {
+  def setNext(n: TypedKdNode): TypedKdNode = this match {
+    case LeafKdNode(lC, lA) => GreaterKdNode(lC, lA, n)
+    case LesserKdNode(lC, lA, lP) => BalancedKdNode(lC, lA, lP, n)
+    case GreaterKdNode(gC, gA, _) => GreaterKdNode(gC, gA, n)
+    case BalancedKdNode(bC, bA, bP, _) => BalancedKdNode(bC, bA, bP, n)
+    case _ => throw InvalidKdSetException(this, n, "next")
+  }
+
+  def dropNext: TypedKdNode = this match {
+    case GreaterKdNode(gC, gA, _) => LeafKdNode(gC, gA)
+    case BalancedKdNode(bC, bA, bP, _) => LesserKdNode(bC, bA, bP)
+    case _ => throw InvalidKdDropException(this, "next")
+  }
+
+  def insertAtDepth(c: TypedCoordinate, depth: Int): TypedKdNode = {
     import KdNode.logging
-    val cmpAxis = depth % this.coordinates.rank
-    val insertAxis = cmpAxis + 1
-    val cmp = n.coordinates.compare(this.coordinates, cmpAxis)
+    val (cmpAxis: Int, insertAxis: Int, cmp: Int) = compareOnAxis(c, depth)
     if (logging) {
-      println((" " * depth) + s" ${n.coordinates} vs ${this.coordinates} using dim $cmpAxis => $cmp")
+      println((" " * depth) + s" $c vs ${this.coordinates} using dim $cmpAxis => $cmp")
     }
 
-    if (logging) {} // println(this.toGraph)}
-
-    this match {
-      case self: KdNode if self.coordinates == n.coordinates =>
-        throw DuplicateCoordinateException()
-
-      case self: LeafKdNode if cmp < 0 =>
-        if (logging) {
-          println("inserting lesser of leaf")
-        }
-        LesserKdNode(self.coordinates, self.axis, n.copy(axis = insertAxis))
-      case self: LeafKdNode =>
-        if (logging) {
-          println("inserting greater of leaf")
-        }
-        GreaterKdNode(self.coordinates, self.axis, n.copy(axis = insertAxis))
-
-      case self: BalancedKdNode =>
-        if (cmp < 0) {
-          if (logging) {
-            println("inserting at depth prev of balanced")
-          }
-          self.copy(prev = self.prev.insertAtDepth(n, depth + 1))
-        } else {
-          if (logging) {
-            println("inserting at depth next of balanced")
-          }
-          self.copy(next = self.next.insertAtDepth(n, depth + 1))
-        }
-      case self: LesserKdNode =>
-        if (cmp < 0) {
-          if (logging) {
-            println("inserting at depth prev of lesser")
-          }
-          self.copy(prev = self.prev.insertAtDepth(n, depth + 1))
-        } else {
-          if (logging) {
-            println("balancing next of lesser")
-          }
-          BalancedKdNode(self.coordinates, self.axis, self.prev, n.copy(axis = insertAxis))
-        }
-      case self: GreaterKdNode =>
-        if (cmp < 0) {
-          if (logging) {
-            println("balancing next of lesser")
-          }
-          BalancedKdNode(self.coordinates, self.axis, n.copy(axis = depth + 1), self.next)
-        } else {
-          if (logging) {
-            println("balancing next of lesser")
-          }
-          self.copy(next = self.next.insertAtDepth(n, depth + 1))
-        }
+    if (cmp == 0 && this.coordinates == c) {
+      throw DuplicateCoordinateException()
+    } else if (cmp < 0) {
+      if (this.maybePrev.isDefined) {
+        val updatedSubtree = this.maybePrev.get.insertAtDepth(c, depth + 1)
+        this.setPrev(updatedSubtree)
+      } else {
+        this.setPrev(LeafKdNode(c, insertAxis))
+      }
+    } else {
+      if (this.maybeNext.isDefined) {
+        val updatedSubtree = this.maybeNext.get.insertAtDepth(c, depth + 1)
+        this.setNext(updatedSubtree)
+      } else {
+        this.setNext(LeafKdNode(c, insertAxis))
+      }
     }
+  }
+
+  def compareOnAxis(c: TypedCoordinate, depth: Int): (Int, Int, Int) = {
+    val cmpAxis = depth % c.rank
+    val insertAxis = (depth + 1) % c.rank
+    val cmp = c.compareOnAxis(this.coordinates, cmpAxis)
+    (cmpAxis, insertAxis, cmp)
   }
 
   def toStringPadded(depth: Int): String = {
     (" " * depth) + (this match {
-      case self: LeafKdNode => s"${self.coordinates}"
-      case self: LesserKdNode => s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}"
-      case self: GreaterKdNode => s"${self.coordinates}n:\n ${self.next.toStringPadded(depth + 1)}"
-      case self: BalancedKdNode =>
+      case self: LeafKdNode[_] => s"${self.coordinates}"
+      case self: LesserKdNode[_] => s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}"
+      case self: GreaterKdNode[_] => s"${self.coordinates}n:\n ${self.next.toStringPadded(depth + 1)}"
+      case self: BalancedKdNode[_] =>
         s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}n:\n ${
           self.next.toStringPadded(depth
             + 1)
         }"
     }).split("\n").mkString((" " * (1 + depth)) + "\n")
   }
-
-  def toGraph: String = {
-    var nodes = Set[String]()
-    var edges = List[(String, String)]()
-    KdTree(Some(this)).foreach(n => {
-      def buildGraphNode(node: KdNode) = {
-        s"${node.coordinates} ${node.axis}" + (node match {
-          case n: BalancedKdNode => "\np n"
-          case n: LesserKdNode => "\np"
-          case n: GreaterKdNode => "\nn"
-          case _ => ""
-        })
-      }
-
-      nodes = nodes + buildGraphNode(n)
-      n match {
-        case n: BalancedKdNode =>
-          val pE = Tuple2(buildGraphNode(n), buildGraphNode(n.prev))
-          val nE = Tuple2(buildGraphNode(n), buildGraphNode(n.next))
-          edges = pE :: nE :: edges
-        case n: LesserKdNode =>
-          edges = Tuple2(buildGraphNode(n), buildGraphNode(n.prev)) :: edges
-        case n: GreaterKdNode =>
-          edges = Tuple2(buildGraphNode(n), buildGraphNode(n.next)) :: edges
-        case _ =>
-      }
-    })
-
-    val g = Graph[String](nodes, edges)
-    g.toString()
-  }
-
 }
 
-case class LeafKdNode(coordinates: Coordinate,
-                      axis: Int = 0)
-  extends KdNode {
+case class LeafKdNode[V](coordinates: Coordinate[V],
+                         axis: Int)
+  extends KdNode[V] {
 }
 
-case class LesserKdNode(coordinates: Coordinate,
-                        axis: Int,
-                        prev: KdNode)
-  extends KdNode {
+case class LesserKdNode[V](coordinates: Coordinate[V],
+                           axis: Int,
+                           prev: KdNode[V])
+  extends KdNode[V] {
 }
 
-case class GreaterKdNode(coordinates: Coordinate,
-                         axis: Int,
-                         next: KdNode)
-  extends KdNode {
+case class GreaterKdNode[V](coordinates: Coordinate[V],
+                            axis: Int,
+                            next: KdNode[V])
+  extends KdNode[V] {
 }
 
-case class BalancedKdNode(coordinates: Coordinate,
-                          axis: Int,
-                          prev: KdNode,
-                          next: KdNode)
-  extends KdNode {
+case class BalancedKdNode[V](coordinates: Coordinate[V],
+                             axis: Int,
+                             prev: KdNode[V],
+                             next: KdNode[V])
+  extends KdNode[V] {
 }
-
-case class DuplicateCoordinateException() extends Exception
