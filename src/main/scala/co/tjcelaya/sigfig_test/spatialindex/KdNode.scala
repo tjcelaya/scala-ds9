@@ -6,7 +6,6 @@ import co.tjcelaya.sigfig_test.spatialindex.exceptions.{DuplicateCoordinateExcep
   * Created by tj on 3/7/17.
   */
 
-
 object KdNode {
   var logging = false
 
@@ -100,10 +99,9 @@ sealed trait KdNode[V] {
       case self: LesserKdNode[_] => s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}"
       case self: GreaterKdNode[_] => s"${self.coordinates}n:\n ${self.next.toStringPadded(depth + 1)}"
       case self: BalancedKdNode[_] =>
-        s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}n:\n ${
-          self.next.toStringPadded(depth
-            + 1)
-        }"
+        s"${self.coordinates}p:\n " +
+          s"${self.prev.toStringPadded(depth + 1)}n:\n " +
+          s"${self.next.toStringPadded(depth + 1)}"
     }).split("\n").mkString((" " * (1 + depth)) + "\n")
   }
 }

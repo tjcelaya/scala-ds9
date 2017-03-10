@@ -8,10 +8,11 @@ import scala.language.implicitConversions
   * Created by tj on 3/7/17.
   */
 object KdTree {
+  def apply(): KdTree = new KdTree
   implicit def toTraversable(kdTree: KdTree): TraversableKdTree = new TraversableKdTree(kdTree)
 }
 
-case class KdTree(rootNode: Option[KdNode[Int]] = None) {
+class KdTree(rootNode: Option[KdNode[Int]] = None) {
   type IntCoordinate = Coordinate[Int]
   type IntNode = KdNode[Int]
 
@@ -26,6 +27,11 @@ case class KdTree(rootNode: Option[KdNode[Int]] = None) {
 
   def copy(rootNode: Option[IntNode] = None) = new KdTree(rootNode)
 
+  /**
+    * Apologies, should've stuck with the functional style, this needs a lot of cleaning up...
+    * @param from
+    * @return
+    */
   def query(from: IntCoordinate): IntNode = {
     if (rootNode.isEmpty)
       throw InvalidQueryException()
@@ -40,13 +46,6 @@ case class KdTree(rootNode: Option[KdNode[Int]] = None) {
     var depth = 0
 
     while (!stop) {
-      val sto = stop
-      val des = descending
-      var curN = currentNode
-      var curB = currentBest
-      var curBD = currentBestDistance
-      var pat = pathStash
-      val dep = depth
       val (_, _, axisDist) = currentNode.compareOnAxis(from, depth)
       val totalDist = currentNode.coordinates.distance(from)
 
@@ -122,8 +121,14 @@ case class KdTree(rootNode: Option[KdNode[Int]] = None) {
 
 }
 
-class TraversableKdTree(override val rootNode: Option[KdNode[Int]] = None)
-  extends KdTree(rootNode = None)
+/**
+  * KdTree was originally traversable but this broke debugging output, so this class was
+  * created and combined with an implicit conversion on KdTree
+  *
+  * @param rootNode
+  */
+class TraversableKdTree(val rootNode: Option[KdNode[Int]] = None)
+  extends KdTree(rootNode = rootNode)
     with Traversable[KdNode[Int]] {
 
   def this(kdTree: KdTree) = {
@@ -137,16 +142,16 @@ class TraversableKdTree(override val rootNode: Option[KdNode[Int]] = None)
     def recur(current: IntNode): Unit = current match {
       case n: LeafKdNode[Int] =>
         f(n)
-      case n @ (previshNode: LesserKdNode[Int]) =>
-        recur(previshNode.prev)
+      case n: LesserKdNode[Int] =>
+        recur(n.prev)
         f(n)
-      case n @ (nextishNode: GreaterKdNode[Int]) =>
+      case n: GreaterKdNode[Int] =>
         f(n)
-        recur(nextishNode.next)
-      case n @ (balancedNode: BalancedKdNode[Int]) =>
-        recur(balancedNode.prev)
+        recur(n.next)
+      case n: BalancedKdNode[Int] =>
+        recur(n.prev)
         f(n)
-        recur(balancedNode.next)
+        recur(n.next)
     }
 
     recur(rootNode.get)

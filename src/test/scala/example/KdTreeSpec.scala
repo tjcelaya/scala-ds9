@@ -3,7 +3,6 @@ package example
 import co.tjcelaya.sigfig_test.spatialindex._
 import co.tjcelaya.sigfig_test.spatialindex.exceptions.DuplicateCoordinateException
 import org.scalatest._
-import sext._
 
 class KdTreeSpec extends FlatSpec with Matchers {
   type C = SeqCoordinate
@@ -100,7 +99,8 @@ class KdTreeSpec extends FlatSpec with Matchers {
     t.query(search).coordinates shouldEqual c1
   }
 
-  // the following code dynamically generates tests from a grid overlaid on the
+  // the following code dynamically generates tests from a grid 10 x 10 grid
+  // uses a test per assertion to make it easier to guage progress
 
   val points = Seq(
     C(2, 3),
@@ -122,12 +122,6 @@ class KdTreeSpec extends FlatSpec with Matchers {
   // generate a grid to thoroughly test ideal point selection
   Range(1, 10)
     .flatMap(x => Range(1, 10).map(y => C(x, y)))
-    //          Seq(
-    //        minSearch,
-    //        maxSearch,
-    //        anotherSearch,
-    //        weirderSearch
-    //      )
     .foreach { (c: C) =>
     val (ideal, _) = points.zip(points.map(_.distance(c))).minBy(_._2)
     it should s"find the correct nearest for $c (which should be $ideal)" in {
