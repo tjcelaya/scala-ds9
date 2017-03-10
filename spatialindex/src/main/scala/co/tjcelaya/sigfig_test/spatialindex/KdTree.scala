@@ -2,8 +2,6 @@ package co.tjcelaya.sigfig_test.spatialindex
 
 import co.tjcelaya.sigfig_test.spatialindex.exceptions.InvalidQueryException
 
-import scala.collection.mutable
-import scala.collection.mutable.Stack
 import scala.language.implicitConversions
 
 /**
@@ -35,13 +33,13 @@ case class KdTree(rootNode: Option[KdNode[Int]] = None) {
     var stop = false
     var descending = true
     var currentNode: IntNode = rootNode.get
-    var currentBest: IntNode = null
-    var currentBestDistance: Double = currentNode.coordinates.distance(from)
+    var currentBest: Option[IntNode] = None
+    var currentBestDistance: Option[Double] = None
     var pathStash = List[IntNode]()
+    var exhausted = Set[IntNode]()
     var depth = 0
 
     while (!stop) {
-      val dist = currentNode.coordinates.distance(from)
       val sto = stop
       val des = descending
       var curN = currentNode
@@ -49,49 +47,79 @@ case class KdTree(rootNode: Option[KdNode[Int]] = None) {
       var curBD = currentBestDistance
       var pat = pathStash
       val dep = depth
-
-      if (dist < currentBestDistance) {
-        currentBest = currentNode
-        currentBestDistance = dist
-        curB = currentBest
-      }
+      val (_, _, axisDist) = currentNode.compareOnAxis(from, depth)
+      val totalDist = currentNode.coordinates.distance(from)
 
       if (descending) {
-        val (_, _, cmp) = currentNode.compareOnAxis(from, depth)
-        if (cmp == 0 && currentNode.coordinates == from) {
-          currentBest = currentNode
+        if (axisDist == 0 && currentNode.coordinates == from) {
+          currentBest = Some(currentNode)
           stop = true
-        } else if (cmp < 0
-          && currentNode.maybePrev.isDefined
-          && currentNode.maybePrev.get.coordinates.distance(from) < currentBestDistance
+        } else if (axisDist < 0 && currentNode.maybePrev.isDefined) {
+          pathStash = currentNode :: pathStash
+          currentNode = currentNode.maybePrev.get
+          depth = depth + 1
+        } else if (0 <= axisDist && currentNode.maybeNext.isDefined) {
+          pathStash = currentNode :: pathStash
+          currentNode = currentNode.maybeNext.get
+          depth = depth + 1
+        } else {
+          descending = false
+          if (currentBest.isEmpty && currentNode.isInstanceOf[LeafKdNode[_]]) {
+            currentBest = Some(currentNode)
+            currentBestDistance = Some(totalDist)
+          }
+        }
+      } else /* ascending */ {
+        if (
+          currentBestDistance.isEmpty
+            ||
+            (currentBestDistance.isDefined && totalDist < currentBestDistance.get)
         ) {
-            pathStash = currentNode :: pathStash
-            currentNode = currentNode.maybePrev.get
-            depth = depth + 1
-        } else if (0 <= cmp
-          && currentNode.maybeNext.isDefined
-          && currentNode.maybeNext.get.coordinates.distance(from) < currentBestDistance
+          currentBest = Some(currentNode)
+          currentBestDistance = Some(totalDist)
+        } else if (
+          currentBestDistance.isDefined
+            && Math.abs(axisDist) < currentBestDistance.get
+            && !exhausted.contains(currentNode)
         ) {
+          exhausted = exhausted + currentNode
+
+          if (axisDist <= 0 && currentNode.maybeNext.isDefined) {
             pathStash = currentNode :: pathStash
             currentNode = currentNode.maybeNext.get
             depth = depth + 1
+            descending = true
+          } else if (0 < axisDist && currentNode.maybePrev.isDefined) {
+            pathStash = currentNode :: pathStash
+            currentNode = currentNode.maybePrev.get
+            depth = depth + 1
+            descending = true
+          } else if (pathStash.nonEmpty) {
+            currentNode = pathStash.head
+            pathStash = pathStash.tail
+            if (depth == 0) {
+              throw new Exception()
+            }
+            depth = depth - 1
+          }
+        } else if (pathStash.nonEmpty) {
+          currentNode = pathStash.head
+          pathStash = pathStash.tail
+          if (depth == 0) {
+            throw new Exception()
+          }
+          depth = depth - 1
         } else {
-          println(s"changing query traversal direction at $currentNode")
-          descending = false
+          stop = true
         }
-      } else /* ascending */ {
-        currentNode = pathStash.head
-        curN = currentNode
-        pathStash = pathStash.tail
-        pat = pathStash
-
-        stop = true
       }
     }
-    currentBest
+
+    currentBest.get
   }
 
   def toStringPadded: String = rootNode.get.toStringPadded(0)
+
 }
 
 class TraversableKdTree(override val rootNode: Option[KdNode[Int]] = None)
@@ -124,7 +152,7 @@ class TraversableKdTree(override val rootNode: Option[KdNode[Int]] = None)
     recur(rootNode.get)
   }
 
-  def printCoordinates: Unit = {
+  def printCoordinates: String = {
     val cs = this.map(_.coordinates)
     val xs = cs.map(_.apply(0))
     val ys = cs.map(_.apply(1))
@@ -136,6 +164,6 @@ class TraversableKdTree(override val rootNode: Option[KdNode[Int]] = None)
 
     val Some((minX, maxX)) = xs.foldLeft(Option.empty[(Int, Int)])(minMax)
     val Some((minY, maxY)) = ys.foldLeft(Option.empty[(Int, Int)])(minMax)
-    println(s"bounds minX: $minX, minY: $minY, maxX: $maxX maxY $maxY ")
+    s"bounds minX: $minX, minY: $minY, maxX: $maxX maxY $maxY"
   }
 }

@@ -6,7 +6,8 @@ package co.tjcelaya.sigfig_test.spatialindex
 abstract class Coordinate[V](implicit ev: V => Ordered[V]) {
   def apply(dim: Int): V
 
-  def compareOnAxis(that: Coordinate[V], dim: Int): Int = this(dim).compare(that(dim))
+  def axisDistance(that: Coordinate[V], dim: Int): Int =
+    this (dim).asInstanceOf[Int] - that(dim).asInstanceOf[Int]
 
   def rank: Int = toSeq.size
 
@@ -19,7 +20,9 @@ case class SeqCoordinate(coordinates: Int*)
   extends Coordinate[Int] {
 
   override def apply(dim: Int): Int = {
-    coordinates(dim % coordinates.size)
+    val effectiveDim = dim % coordinates.size
+    val v = coordinates(effectiveDim)
+    v
   }
 
   override def distance(that: Coordinate[Int]): Double = {

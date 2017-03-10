@@ -1,7 +1,6 @@
 package co.tjcelaya.sigfig_test.spatialindex
 
 import co.tjcelaya.sigfig_test.spatialindex.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException}
-import com.github.mdr.ascii.graph.Graph
 
 /**
   * Created by tj on 3/7/17.
@@ -11,9 +10,9 @@ import com.github.mdr.ascii.graph.Graph
 object KdNode {
   var logging = false
 
-  def apply(coordinate: Coordinate[Int], axis: Int) = LeafKdNode[Int](coordinate, axis)
+  def apply(coordinate: Coordinate[Int], axis: Int): LeafKdNode[Int] = LeafKdNode[Int](coordinate, axis)
 
-  def apply(axis: Int, xs: Int*) = LeafKdNode(SeqCoordinate(xs: _*), axis)
+  def apply(axis: Int, xs: Int*): LeafKdNode[Int] = LeafKdNode(SeqCoordinate(xs: _*), axis)
 }
 
 sealed trait KdNode[V] {
@@ -91,7 +90,7 @@ sealed trait KdNode[V] {
   def compareOnAxis(c: TypedCoordinate, depth: Int): (Int, Int, Int) = {
     val cmpAxis = depth % c.rank
     val insertAxis = (depth + 1) % c.rank
-    val cmp = c.compareOnAxis(this.coordinates, cmpAxis)
+    val cmp = c.axisDistance(this.coordinates, cmpAxis)
     (cmpAxis, insertAxis, cmp)
   }
 
