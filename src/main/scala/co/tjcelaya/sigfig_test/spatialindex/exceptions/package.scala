@@ -10,4 +10,5 @@ package object exceptions {
   }
   case class InvalidKdDropException(self: KdNode[_], side: String) extends Exception
   case class InvalidQueryException() extends Exception
+  case class InvalidStateException(msg: String) extends Exception(msg)
 }

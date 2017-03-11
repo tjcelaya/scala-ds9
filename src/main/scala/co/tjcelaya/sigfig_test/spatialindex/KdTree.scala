@@ -1,6 +1,6 @@
 package co.tjcelaya.sigfig_test.spatialindex
 
-import co.tjcelaya.sigfig_test.spatialindex.exceptions.InvalidQueryException
+import co.tjcelaya.sigfig_test.spatialindex.exceptions.{InvalidQueryException, InvalidStateException}
 
 import scala.language.implicitConversions
 
@@ -9,6 +9,7 @@ import scala.language.implicitConversions
   */
 object KdTree {
   def apply(): KdTree = new KdTree
+
   implicit def toTraversable(kdTree: KdTree): TraversableKdTree = new TraversableKdTree(kdTree)
 }
 
@@ -27,8 +28,92 @@ class KdTree(rootNode: Option[KdNode[Int]] = None) {
 
   def copy(rootNode: Option[IntNode] = None) = new KdTree(rootNode)
 
+  def queryR(from: IntCoordinate): IntNode = {
+    import Math.abs
+    case class NNResult[T](best: Option[(T, Double)], seen: Set[T] = Set())
+
+    def qR(search: IntCoordinate,
+           depth: Int,
+           node: IntNode,
+           nnRes: NNResult[IntNode]): NNResult[IntNode] = {
+      val cA = depth % search.rank
+      val coords = node.coordinates
+      val aD = search axisDistance(coords, cA)
+      val aaD = Math.abs(aD)
+      val tD = search distance coords
+      if (tD < 1) {
+        throw new Exception()
+      }
+
+      (node, nnRes) match {
+
+        // insertion traversal phase
+
+        case (lfN: LeafKdNode[Int], NNResult(None, _)) =>
+          // reached a leaf and don't have a best yet, set it
+          nnRes copy (best = Some(lfN, tD))
+        case (ltN: LesserKdNode[Int], eR @ NNResult(None, _)) if aD < 0 =>
+          qR(search, depth + 1, ltN.prev, eR) match {
+            case sR @ NNResult(Some(_), _) => sR
+            case _ => eR
+          }
+        case (gtN: GreaterKdNode[Int], eR @ NNResult(None, _)) if 0 <= aD =>
+          qR(search, depth + 1, gtN.next, eR) match {
+            case sR @ NNResult(Some(_), _) => sR
+            case _ => eR
+          }
+        case (blN: BalancedKdNode[Int], eR @ NNResult(None, _)) if aD < 0 =>
+          qR(search, depth + 1, blN.prev, eR) match {
+            case sR @ NNResult(Some((_, nbD)), _) if aaD < nbD =>
+              qR(search, depth + 1, blN.next, sR)
+            case sR @ NNResult(Some((_, nbD)), _) => sR
+            case _ => eR
+          }
+        case (blN: BalancedKdNode[Int], eR @ NNResult(None, _)) if 0 <= aD =>
+          qR(search, depth + 1, blN.next, eR) match {
+            case sR @ NNResult(Some((_, nbD)), _) if aaD < nbD =>
+              qR(search, depth + 1, blN.prev, sR)
+            case sR @ NNResult(Some((_, nbD)), _) => sR
+            case _ => eR
+          }
+
+        case (lfN: LeafKdNode[Int], NNResult(Some((cbN, cbD)), _)) if tD < cbD =>
+          nnRes copy (best = Some(lfN, tD))
+
+
+        // attempting alternates after reaching the node we'd insert at
+
+        case (ltN: LesserKdNode[Int], cR @ NNResult(Some((_, cbD)), _)) if aaD < cbD =>
+          qR(search, depth + 1, ltN.prev, nnRes) match {
+            case nR @ NNResult(Some((_, nbD)), _) if nbD < tD => nR
+            case _ => cR
+          }
+        case (gtN: GreaterKdNode[Int], cR @ NNResult(Some((_, cbD)), _)) if aaD < cbD =>
+          qR(search, depth + 1, gtN.next, nnRes) match {
+            case sR @ NNResult(Some((_, nbD)), _) if nbD < tD => sR
+            case _ => cR
+          }
+
+        case (n: IntNode, NNResult(None, _)) =>
+          qR(search, depth, n, nnRes.copy(best = Some(n, tD)))
+
+        case (n: IntNode, NNResult(Some((_, cbD)), _)) if tD < cbD =>
+          nnRes.copy(best = Some((n, tD)))
+
+        case _ =>
+          println(s"giving up from $node")
+          nnRes
+        // val checkNext = qR(search, depth + 1, blN.prev, nnRes)
+      }
+    }
+
+    val r = qR(from, 0, rootNode.get, NNResult(None, Set[IntNode]())).best
+    if (r.isEmpty) null else r.get._1
+  }
+
   /**
     * Apologies, should've stuck with the functional style, this needs a lot of cleaning up...
+    *
     * @param from
     * @return
     */
@@ -118,7 +203,6 @@ class KdTree(rootNode: Option[KdNode[Int]] = None) {
   }
 
   def toStringPadded: String = rootNode.get.toStringPadded(0)
-
 }
 
 /**
@@ -172,3 +256,31 @@ class TraversableKdTree(val rootNode: Option[KdNode[Int]] = None)
     s"bounds minX: $minX, minY: $minY, maxX: $maxX maxY $maxY"
   }
 }
+
+
+
+//        case (blN: BalancedKdNode[Int], eR @ NNResult(None, _)) =>
+//          val childDepth = depth + 1
+//          val prevAxisDist = search.axisDistance(blN.prev.coordinates, childDepth)
+//          val nextAxisDist = search.axisDistance(blN.next.coordinates, childDepth)
+//          (
+//            (
+//              if (aD < 0)
+//                qR(search, depth + 1, blN.prev, nnRes)
+//              else eR,
+//              if (0 <= aD)
+//                qR(search, depth + 1, blN.next, nnRes)
+//              else eR
+//            ) match {
+//              case (NNResult(None, _), NNResult(None, _)) => eR
+//              case (p @ NNResult(Some((_, _)), _), NNResult(None, _)) => p
+//              case (NNResult(None, _), n @ NNResult(Some((_, _)), _)) => n
+//              case (p @ NNResult(Some((_, prevND)), _), n @ NNResult(Some((_, nextND)), _)) =>
+//                if (prevND < nextND) p else n
+//            }) match {
+//             // subtree result is better than us, use it
+//            case sR @ NNResult(Some((_, nbD)), _) if nbD < tD || nbD == tD => sR
+//
+//             // we are closer than either subtree
+//            case sR @ NNResult(Some((_, nbD)), _) if tD < nbD => sR.copy(best = Some((node, tD)))
+//          }
