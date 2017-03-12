@@ -1,12 +1,13 @@
-package co.tjcelaya.sigfig_test.spatialindex
+package co.tjcelaya.ds9.spatialindex
 
-import co.tjcelaya.sigfig_test.spatialindex.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException, InvalidQueryException}
+import co.tjcelaya.ds9.common.{Rank, SplitRange}
+import co.tjcelaya.ds9.spatialindex.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException}
 
 /**
   * Created by tj on 3/7/17.
   */
 
-abstract class KdNode[V: Distanced] {
+abstract class KdNode[V: Distanced : Extrema: Ordering] {
   type TypedKdNode = KdNode[V]
   type TypedCoordinate = Coordinate[V]
   type TypedSplitRange = SplitRange[V]
@@ -57,7 +58,7 @@ abstract class KdNode[V: Distanced] {
     val compared = compareOnAxis(c, depth)
     val cmpAxis = compared._1
     val cmp = compared._2.shortValue()
-    val insertAxis = (depth + 1) % coordinates.rank
+    val insertRank = (depth + 1) % coordinates.rank
 
     if (cmp == 0 && this.coordinates == c) {
       throw DuplicateCoordinateException()
@@ -66,21 +67,21 @@ abstract class KdNode[V: Distanced] {
         val updatedSubtree = this.maybePrev.get.insertAtDepth(c, depth + 1)
         this.setPrev(updatedSubtree)
       } else {
-        this.setPrev(LeafKdNode(c, insertAxis))
+        this.setPrev(LeafKdNode(c, new Rank(insertRank)))
       }
     } else {
       if (this.maybeNext.isDefined) {
         val updatedSubtree = this.maybeNext.get.insertAtDepth(c, depth + 1)
         this.setNext(updatedSubtree)
       } else {
-        this.setNext(LeafKdNode(c, insertAxis))
+        this.setNext(LeafKdNode(c, new Rank(insertRank)))
       }
     }
   }
 
-  def compareOnAxis(c: TypedCoordinate, depth: Int): (Int, Number) = {
-    val cmpAxis = depth % c.rank
-    val cmp = c.axisDistance(this.coordinates, cmpAxis)
+  def compareOnAxis(c: TypedCoordinate, depth: Int): (Rank, Number) = {
+    val cmpAxis = new Rank(depth % c.rank)
+    val cmp = c.axisDistance(this.coordinates, cmpAxis.i)
     (cmpAxis, cmp)
   }
 
@@ -96,39 +97,51 @@ abstract class KdNode[V: Distanced] {
     }).split("\n").mkString((" " * (1 + depth)) + "\n")
   }
 
-  def axisBounds(parent: Option[TypedKdNode], axis: Int = 0): TypedSplitRange = parent match {
-    //    case None =>
-    //      TypedSplitRange(V.minVal, coordinates(axis), V.maxVal)
-    case _ =>
-      throw new Exception()
+  def dimensionBounds(maybeParent: Option[TypedKdNode], rank: Rank): TypedSplitRange = {
+    if (maybeParent.isDefined)
+      require(rank.i > 0, s"rank should be greater than 0 if a parent is given, was $rank")
+
+    val iD = implicitly[Distanced[V]]
+    val iE = implicitly[Extrema[V]]
+    val iO = implicitly[Ordering[V]]
+    val parentRank = rank.i - 1
+    maybeParent match {
+      case None =>
+        TypedSplitRange(iE.minVal, coordinates(rank.i), iE.maxVal)
+      case Some(parent) =>
+        val cmpToParent = iD.distance(coordinates(parentRank), parent.coordinates(parentRank))
+
+        if (cmpToParent.shortValue < 0) {
+          throw new Exception()
+        }
+
+        TypedSplitRange(iE.minVal, coordinates(rank.i), iE.maxVal)
+      case _ =>
+        throw new Exception()
+    }
   }
 
   def hyperBounds(parent: Option[TypedKdNode]): Seq[TypedSplitRange] = {
-    coordinates.rank.to(0).map(axisBounds(parent, _))
+    coordinates.rank.to(0).map((r: Int) => dimensionBounds(parent, new Rank(r)))
   }
-
 }
 
-
-
-
-
-case class LeafKdNode[V: Distanced](coordinates: Coordinate[V],
-                                    axis: Int)
+case class LeafKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
+                                              rank: Rank)
   extends KdNode[V]
 
-case class LesserKdNode[V: Distanced](coordinates: Coordinate[V],
-                                      axis: Int,
-                                      prev: KdNode[V])
+case class LesserKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
+                                                rank: Rank,
+                                                prev: KdNode[V])
   extends KdNode[V]
 
-case class GreaterKdNode[V: Distanced](coordinates: Coordinate[V],
-                                       axis: Int,
-                                       next: KdNode[V])
+case class GreaterKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
+                                                 rank: Rank,
+                                                 next: KdNode[V])
   extends KdNode[V]
 
-case class BalancedKdNode[V: Distanced](coordinates: Coordinate[V],
-                                        axis: Int,
-                                        prev: KdNode[V],
-                                        next: KdNode[V])
+case class BalancedKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
+                                                  rank: Rank,
+                                                  prev: KdNode[V],
+                                                  next: KdNode[V])
   extends KdNode[V]

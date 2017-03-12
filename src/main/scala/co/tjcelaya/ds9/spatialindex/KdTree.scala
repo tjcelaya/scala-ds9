@@ -1,6 +1,7 @@
-package co.tjcelaya.sigfig_test.spatialindex
+package co.tjcelaya.ds9.spatialindex
 
-import co.tjcelaya.sigfig_test.spatialindex.exceptions.{InvalidQueryException, InvalidStateException}
+import co.tjcelaya.ds9.common.{Rank, SplitRange}
+import co.tjcelaya.ds9.spatialindex.exceptions._
 
 import scala.language.implicitConversions
 
@@ -8,20 +9,22 @@ import scala.language.implicitConversions
   * Created by tj on 3/7/17.
   */
 object KdTree {
-  def apply[V : Distanced](): KdTree[V] = new KdTree(None)
+  def apply[V: Distanced : Extrema: Ordering](): KdTree[V] = new KdTree(None)
 
-  implicit def toTraversable[V : Distanced](kdTree: KdTree[V]): TraversableKdTree[V] = new
+  implicit def toTraversable[V: Distanced : Extrema: Ordering](kdTree: KdTree[V]): TraversableKdTree[V] = new
       TraversableKdTree(kdTree)
 }
 
-class KdTree[V : Distanced](rootNode: Option[KdNode[V]] = None) {
+class KdTree[V: Distanced : Extrema: Ordering](rootNode: Option[KdNode[V]] = None) {
+  type TypedSplitRange = SplitRange[V]
+  val TypedSplitRange = SplitRange
   type TypedCoordinate = Coordinate[V]
   type TypedNode = KdNode[V]
 
   def root: Option[TypedNode] = rootNode
 
   def insert(c: TypedCoordinate): KdTree[V] = rootNode match {
-    case None => copy(rootNode = Some(LeafKdNode(c, 0)))
+    case None => copy(rootNode = Some(LeafKdNode(c, new Rank(0))))
     case Some(r) =>
       val newRoot = this.rootNode.get.insertAtDepth(c, 0)
       copy(rootNode = Some(newRoot))
@@ -34,26 +37,33 @@ class KdTree[V : Distanced](rootNode: Option[KdNode[V]] = None) {
       throw InvalidQueryException()
     }
 
-    import Math.abs
-    case class NNResult[T](best: Option[(T, Double)], seen: Set[T] = Set())
+    case class NNResult[V](best: Option[(V, Double)] = None, seen: Set[V] = Set())
+    val emptyChamp = NNResult[TypedNode](None, Set[TypedNode]())
+
+
+    def sphereWithinBounds(space: Seq[TypedSplitRange], coordinate: TypedCoordinate): Boolean = {
+      (0 to coordinate.rank).forall((i: Int) => space(i).contains(coordinate(i)))
+    }
 
     def qR(search: TypedCoordinate,
            depth: Int,
-           node: Option[TypedNode],
+           maybeParent: Option[TypedNode],
+           node: TypedNode,
            champ: NNResult[TypedNode]): NNResult[TypedNode] = {
-      // val cA = depth % search.rank
-      // val coords = node.coordinates
-      // val aD = search axisDistance(coords, cA)
-      // val aaD = Math.abs(aD)
-      // val tD = search distance coords
-      // if (tD < 1) {
-      //   throw new Exception()
-      // }
+      val (axisRank: Rank, cmp: Number) = node.compareOnAxis(search, depth)
+      val coords = node.coordinates
+      val tD = node.coordinates.distance(search)
+      val aaD = Math.abs(cmp.doubleValue)
 
-      NNResult(None, Set())
+      if (node.hyperBounds(maybeParent).contains(search)) {
+        // study this node
+        champ.copy(best = Some((node, tD)), seen = champ.seen + node)
+      } else {
+        emptyChamp
+      }
     }
 
-    val r = qR(from, 0, rootNode, NNResult(None, Set[TypedNode]())).best
+    val r = qR(from, 0, None, rootNode.get, emptyChamp).best
     if (r.isEmpty) null else r.get._1
   }
 
@@ -66,7 +76,7 @@ class KdTree[V : Distanced](rootNode: Option[KdNode[V]] = None) {
   *
   * @param rootNode
   */
-class TraversableKdTree[V : Distanced](val rootNode: Option[KdNode[V]] = None)
+class TraversableKdTree[V: Distanced : Extrema: Ordering](val rootNode: Option[KdNode[V]] = None)
   extends KdTree[V](rootNode = rootNode)
     with Traversable[KdNode[V]] {
 
@@ -106,9 +116,9 @@ class TraversableKdTree[V : Distanced](val rootNode: Option[KdNode[V]] = None)
         case None => Some(nex, nex)
         case Some((mi, ma)) =>
           Some((
-          if (iD.distance(mi, nex).shortValue() < 0) nex else mi,
-          if (iD.distance(ma, nex).shortValue() > 0) nex else ma
-        ))
+            if (iD.distance(mi, nex).shortValue() < 0) nex else mi,
+            if (iD.distance(ma, nex).shortValue() > 0) nex else ma
+          ))
       }
 
     val Some((minX, maxX)) = xs.foldLeft(Option.empty[(V, V)])(minMax)

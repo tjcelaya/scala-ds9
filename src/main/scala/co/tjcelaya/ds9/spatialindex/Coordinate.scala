@@ -1,4 +1,4 @@
-package co.tjcelaya.sigfig_test.spatialindex
+package co.tjcelaya.ds9.spatialindex
 
 /**
   * Created by tj on 3/7/17.
