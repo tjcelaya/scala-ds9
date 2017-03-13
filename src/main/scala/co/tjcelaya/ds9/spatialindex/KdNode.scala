@@ -58,7 +58,7 @@ abstract class KdNode[V: Distanced : Extrema: Ordering] {
     val compared = compareOnAxis(c, depth)
     val cmpAxis = compared._1
     val cmp = compared._2.shortValue()
-    val insertRank = (depth + 1) % coordinates.rank
+    val insertRank = (depth + 1) % coordinates.rank.v
 
     if (cmp == 0 && this.coordinates == c) {
       throw DuplicateCoordinateException()
@@ -80,8 +80,8 @@ abstract class KdNode[V: Distanced : Extrema: Ordering] {
   }
 
   def compareOnAxis(c: TypedCoordinate, depth: Int): (Rank, Number) = {
-    val cmpAxis = new Rank(depth % c.rank)
-    val cmp = c.axisDistance(this.coordinates, cmpAxis.i)
+    val cmpAxis = new Rank(depth % c.rank.v)
+    val cmp = c.axisDistance(this.coordinates, cmpAxis)
     (cmpAxis, cmp)
   }
 
@@ -98,31 +98,30 @@ abstract class KdNode[V: Distanced : Extrema: Ordering] {
   }
 
   def dimensionBounds(maybeParent: Option[TypedKdNode], rank: Rank): TypedSplitRange = {
-    if (maybeParent.isDefined)
-      require(rank.i > 0, s"rank should be greater than 0 if a parent is given, was $rank")
-
     val iD = implicitly[Distanced[V]]
     val iE = implicitly[Extrema[V]]
     val iO = implicitly[Ordering[V]]
-    val parentRank = rank.i - 1
     maybeParent match {
       case None =>
-        TypedSplitRange(iE.minVal, coordinates(rank.i), iE.maxVal)
+        TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
       case Some(parent) =>
+        val parentRank = rank.decrement(this.coordinates.rank)
         val cmpToParent = iD.distance(coordinates(parentRank), parent.coordinates(parentRank))
 
-        if (cmpToParent.shortValue < 0) {
-          throw new Exception()
-        }
+        rank.decrement(coordinates.rank)
 
-        TypedSplitRange(iE.minVal, coordinates(rank.i), iE.maxVal)
+        TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
       case _ =>
         throw new Exception()
     }
   }
 
   def hyperBounds(parent: Option[TypedKdNode]): Seq[TypedSplitRange] = {
-    coordinates.rank.to(0).map((r: Int) => dimensionBounds(parent, new Rank(r)))
+    val bs = (0 to coordinates.rank.v).map((r: Int) => {
+      dimensionBounds(parent, new Rank(r))
+    })
+
+    bs
   }
 }
 

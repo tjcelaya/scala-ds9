@@ -12,7 +12,11 @@ class KdNodeSpec extends FlatSpec with Matchers {
   type C = SeqCoordinate[Int]
   val C = SeqCoordinate // object equivalent of `type C = SeqCoordinate`
 
-  it should "be a thing" in {
+  ignore should "be a thing" in {
     val n = LeafKdNode[Int](C(1, 2), new Rank(0))
+  }
+
+  ignore should "" in {
+
   }
 }

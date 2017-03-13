@@ -1,15 +1,17 @@
 package co.tjcelaya.ds9.spatialindex
 
+import co.tjcelaya.ds9.common.Rank
+
 /**
   * Created by tj on 3/7/17.
   */
 abstract class Coordinate[V: Distanced] {
-  def apply(dim: Int): V
+  def apply(rank: Rank): V
 
-  def axisDistance(that: Coordinate[V], dim: Int): Number =
-    implicitly[Distanced[V]].distance(that(dim), this (dim))
+  def axisDistance(that: Coordinate[V], r: Rank): Number =
+    implicitly[Distanced[V]].distance(that(r), this (r))
 
-  def rank: Int = toSeq.size
+  def rank: Rank = new Rank(toSeq.size)
 
   def distance(that: Coordinate[V]): Double
 
@@ -19,8 +21,8 @@ abstract class Coordinate[V: Distanced] {
 case class SeqCoordinate[V: Distanced](coordinates: V*)
   extends Coordinate[V] {
 
-  override def apply(dim: Int): V = {
-    val effectiveDim = dim % coordinates.size
+  override def apply(rank: Rank): V = {
+    val effectiveDim = rank.v % coordinates.size
     val v = coordinates(effectiveDim)
     v
   }
@@ -35,7 +37,7 @@ case class SeqCoordinate[V: Distanced](coordinates: V*)
     }
   }
 
-  override def rank: Int = coordinates.size
+  override def rank: Rank = new Rank(coordinates.size)
 
   // override def foreach[U](f: (Coordinate) => U): Unit = coordinates.foreach _
 

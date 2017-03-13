@@ -1,7 +1,5 @@
 package co.tjcelaya.ds9.spatialindex
 
-import co.tjcelaya.ds9.spatialindex.{Distanced, Extrema}
-
 import scala.language.implicitConversions
 
 /**

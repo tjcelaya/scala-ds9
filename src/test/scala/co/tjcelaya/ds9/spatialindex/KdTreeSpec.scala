@@ -1,5 +1,6 @@
 package co.tjcelaya.ds9.spatialindex
 
+import co.tjcelaya.ds9.common.Rank
 import co.tjcelaya.ds9.spatialindex.exceptions.DuplicateCoordinateException
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -9,7 +10,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
   type C = SeqCoordinate[Int]
   val C = SeqCoordinate // object equivalent of `type C = SeqCoordinate`
 
-  ignore should "be empty by default" in {
+  it should "be empty by default" in {
     val emptyTree = KdTree[Int]()
     emptyTree.isEmpty shouldEqual true
     val x = 1
@@ -21,7 +22,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
     size shouldEqual 0
   }
 
-  ignore should "accept inserts for lesser values" in {
+  it should "accept inserts for lesser values" in {
     val minCoords = C(1, 1)
     val t0 = KdTree[Int]()
     val t1 = t0.insert(C(3, 3))
@@ -36,7 +37,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
       .coordinates shouldEqual minCoords
   }
 
-  ignore should "accept inserts for greater values" in {
+  it should "accept inserts for greater values" in {
     val maxCoords = C(9, 9)
     val t = KdTree[Int]()
       .insert(C(5, 5))
@@ -51,7 +52,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
       .coordinates shouldEqual maxCoords
   }
 
-  ignore should "accept a mix of values" in {
+  it should "accept a mix of values" in {
     val prevExpected = C(2, 6)
     val nextExpected = C(7, 9)
     val t = KdTree[Int]()
@@ -70,7 +71,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
       .coordinates shouldEqual nextExpected
   }
 
-  ignore should "accept more inserts" in {
+  it should "accept more inserts" in {
     val t = KdTree[Int]()
       .insert(C(30, 40))
       .insert(C(5, 25))
@@ -82,7 +83,7 @@ class KdTreeSpec extends FlatSpec with Matchers {
     t.size shouldEqual 6
   }
 
-  ignore should "prevent duplicates" in {
+  it should "prevent duplicates" in {
     assertThrows[DuplicateCoordinateException] {
       val t = KdTree[Int]()
         .insert(C(1, 2))
@@ -127,20 +128,20 @@ class KdTreeSpec extends FlatSpec with Matchers {
 //      .flatMap(x => Range(1, 10).map(y => C(x, y)))
   //     Seq(C(3, 5), C(4, 2), C(5, 2), C(6, 3), C(6, 6), C(7, 1), C(7, 5), C(7, 9), C(8, 3))
   Seq(
-//    minSearch
-//    ,
-//    maxSearch
-//    ,
-//    anotherSearch
-//    ,
-//    weirderSearch
+    minSearch
+    ,
+    maxSearch
+    ,
+    anotherSearch
+    ,
+    weirderSearch
   )
     .foreach { (c: C) =>
       val (ideal, _) = points.zip(points.map(_.distance(c))).minBy(_._2)
       it should s"find the correct nearest for $c (which should be $ideal)" in {
         val res = t.query(c).coordinates
         res shouldEqual ideal
-        val x = 1
       }
     }
+
 }
