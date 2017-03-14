@@ -57,15 +57,10 @@ class KdNodeSpec extends FlatSpec with Matchers {
     bounds1.lower shouldEqual 5
   }
 
-
   Seq(C(2, 2), C(5, 5), C(9, 9)).permutations.foreach({ coordList =>
     val (c1 :: c2 :: c3 :: Nil) = coordList
 
     it should s"be bounded by all parents using the following insertion order $c1, $c2, $c3" in {
-      // val grandChild = LeafKdNode[Int](C(5, 5), new Rank(0))
-      // val child = LesserKdNode[Int](C(9, 9), new Rank(1), grandChild)
-      // val root = GreaterKdNode[Int](C(2, 2), new Rank(0), child)
-
       val t0 = KdTree[Int]().insert(C(2, 2)).insert(C(9, 9)).insert(C(5, 5))
       val root = t0.rootNode.get
       val child = root.maybeNext.get

@@ -11,7 +11,6 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
   type TypedKdNode = KdNode[V]
   type TypedCoordinate = Coordinate[V]
   type TypedSplitRange = SplitRange[V]
-  val TypedSplitRange = SplitRange
   val coordinates: TypedCoordinate
   val rank: Rank
 
@@ -86,16 +85,8 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
     (cmpAxis, cmp)
   }
 
-  def toStringPadded(depth: Int): String = {
-    (" " * depth) + (this match {
-      case self: LeafKdNode[_] => s"${self.coordinates}"
-      case self: LesserKdNode[_] => s"${self.coordinates}p:\n ${self.prev.toStringPadded(depth + 1)}"
-      case self: GreaterKdNode[_] => s"${self.coordinates}n:\n ${self.next.toStringPadded(depth + 1)}"
-      case self: BalancedKdNode[_] =>
-        s"${self.coordinates}p:\n " +
-          s"${self.prev.toStringPadded(depth + 1)}n:\n " +
-          s"${self.next.toStringPadded(depth + 1)}"
-    }).split("\n").mkString((" " * (1 + depth)) + "\n")
+  def hyperBounds(parents: Seq[TypedKdNode]): Seq[TypedSplitRange] = {
+    (0 until coordinates.rank.v).map(r => dimensionBounds(parents, new Rank(r)))
   }
 
   def dimensionBounds(parents: Seq[TypedKdNode], rank: Rank): TypedSplitRange = {
@@ -104,15 +95,13 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
     val iO = implicitly[Ordering[V]]
 
     parents.foldLeft[TypedSplitRange](
-      TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
+      SplitRange(iE.minVal, coordinates(rank), iE.maxVal)
     ) {
       (acc: TypedSplitRange, rankedAncestor: TypedKdNode) =>
 
         val parentSplit: V = rankedAncestor.coordinates(rank)
 
-        val prevParent = iO.compare(parentSplit, coordinates(rank)) <= 0
-
-        if (prevParent) {
+        if (iO.compare(parentSplit, coordinates(rank)) <= 0) {
           if (iO.gt(parentSplit, acc.lower)) {
             acc.copy(lower = parentSplit)
           } else {
@@ -126,14 +115,6 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
           }
         }
     }
-  }
-
-  def hyperBounds(parents: Seq[TypedKdNode]): Seq[TypedSplitRange] = {
-    val bs = (0 until coordinates.rank.v).map((r: Int) => {
-      dimensionBounds(parents, new Rank(r))
-    })
-
-    bs
   }
 }
 

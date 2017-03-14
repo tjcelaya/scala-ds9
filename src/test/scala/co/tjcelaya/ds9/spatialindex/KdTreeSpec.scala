@@ -3,8 +3,6 @@ package co.tjcelaya.ds9.spatialindex
 import co.tjcelaya.ds9.spatialindex.exceptions.DuplicateCoordinateException
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.util.Random
-
 class KdTreeSpec extends FlatSpec with Matchers {
 
   import co.tjcelaya.ds9.spatialindex.implicits._
@@ -104,40 +102,32 @@ class KdTreeSpec extends FlatSpec with Matchers {
 
     t.query(search).coordinates shouldEqual c1
   }
+
   // the following code dynamically generates tests from a grid 10 x 10 grid
   // uses a test per assertion to make it easier to guage progress
 
-  val possiblePoints =
-    Seq.fill(20)(Random.nextInt(100))
-      .zip(Seq.fill(20)(Random.nextInt(100)))
-      .map(pair => C(pair._1, pair._2))
+  private val points = Seq(C(2, 3), C(5, 4), C(9, 6), C(4, 7), C(8, 1), C(7, 2))
 
-  possiblePoints.permutations.take(1).foreach(currentPermutation => {
+  // foldLeft accepts an initial val (an empty tree here)
+  // and a function from ((acc: $INITIAL_VAL_T, $T_OF_SEQ) => updated $INITIAL_VAL_T)
+  private val t = points.foldLeft[KdTree[Int]](KdTree[Int]())(_.insert(_))
 
-    val points = currentPermutation
-    // foldLeft accepts an initial val (an empty tree here)
-    // and a function from ((acc: $INITIAL_VAL_T, $T_OF_SEQ) => updated $INITIAL_VAL_T)
-    val t = points.foldLeft[KdTree[Int]](KdTree[Int]())(_.insert(_))
+  // generate a grid to thoroughly test ideal point selection
+  Range(1, 10)
+    .flatMap(x => Range(1, 10).map(y => C(x, y)))
+    .foreach { (c: C) =>
+      val ideals: Seq[SeqCoordinate[Int]] = points
+        .groupBy(_.distance(c))
+        .toSeq
+        .minBy(_._1)
+        ._2
 
-    // generate a grid to thoroughly test ideal point selection
-    Range(1, 100)
-      .flatMap(x => Range(1, 100).map(y => C(x, y)))
-      .foreach { (c: C) =>
-        val ideals: Seq[SeqCoordinate[Int]] = points
-          .groupBy(_.distance(c))
-          .toSeq
-          .minBy(_._1)
-          ._2
+      it should s"find the correct nearest for $c (which should be one of ${ideals.mkString(",")}" in {
 
-        it should s"${points.hashCode} find the correct nearest for $c (which should be one of ${ideals.mkString(",")}" in {
+        val res = t.query(c).coordinates
 
-          val res = t.query(c).coordinates
-
-          ideals shouldContain
-
-          ideals.contains(res) shouldEqual true
-        }
+        ideals.contains(res) shouldEqual true
       }
-  })
+    }
 
 }

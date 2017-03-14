@@ -9,19 +9,20 @@ import scala.language.implicitConversions
   * Created by tj on 3/7/17.
   */
 object KdTree {
-  def apply[V: Distanced : Extrema : Ordering](): KdTree[V] = new KdTree(None)
 
   var debug = false
 
-  implicit def toTraversable[V: Distanced : Extrema : Ordering](kdTree: KdTree[V]): TraversableKdTree[V] = new
-      TraversableKdTree(kdTree)
+  def apply[V: Distanced : Extrema : Ordering](): KdTree[V] = new KdTree(None)
+
+  implicit def toTraversable[V: Distanced : Extrema : Ordering](kdTree: KdTree[V]): TraversableKdTree[V] =
+    new TraversableKdTree(kdTree)
 }
 
-class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = None) {
+class KdTree[V: Distanced : Extrema : Ordering](val rootNode: Option[KdNode[V]] = None) {
   type TypedSplitRange = SplitRange[V]
-  val TypedSplitRange = SplitRange
   type TypedCoordinate = Coordinate[V]
   type TypedNode = KdNode[V]
+  val TypedSplitRange = SplitRange
 
   def root: Option[TypedNode] = rootNode
 
@@ -38,10 +39,6 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
     if (rootNode.isEmpty) {
       throw InvalidQueryException()
     }
-
-    case class NNResult[V](best: Option[(V, Double)] = None, seen: Set[V] = Set())
-    val emptyChamp = NNResult[TypedNode](None, Set[TypedNode]())
-
 
     def sphereWithinBounds(space: Seq[TypedSplitRange], coordinate: TypedCoordinate): Boolean = {
       (0 to coordinate.rank.v).forall((i: Int) => {
@@ -103,28 +100,22 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
         if (maybeFartherChild.isDefined) {
           val fartherChild = maybeFartherChild.get
           val fartherChildBounds = fartherChild.hyperBounds(path)
-          val checks = fartherChildBounds.zipWithIndex.map({
+          val shouldCheckFurther = fartherChildBounds.zipWithIndex.exists({
             (splitRangeWithRank: (TypedSplitRange, Int)) =>
               val searchValueAtRank = search(new Rank(splitRangeWithRank._2))
               val r = splitRangeWithRank._1.contains(searchValueAtRank)
               r
           })
 
-          val shouldCheck = checks.exists(boo => boo)
-
-
-          if (shouldCheck) {
+          if (shouldCheckFurther) {
             qR(search, depth + 1, path, fartherChild, leafUpdate) match {
               case NNResult(None, _) => nearerUpdate
               case fartherResult @ NNResult(Some((fbN, fbD)), _) =>
-
-                val comparedResult = if (nearerUpdate.best.isEmpty
+                if (nearerUpdate.best.isEmpty
                   || (nearerUpdate.best.isDefined && fbD < nearerUpdate.best.get._2))
                   fartherResult
                 else
                   nearerUpdate
-
-                comparedResult
             }
           } else {
             nearerUpdate
@@ -144,14 +135,11 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
           seenUpdate
         }
 
-
       fallbackUpdate
     }
 
-    qR(from, 0, Seq(), rootNode.get, emptyChamp).best.get._1
+    qR(from, 0, Seq(), rootNode.get, NNResult(None, Set())).best.get._1
   }
-
-  def toStringPadded: String = rootNode.get.toStringPadded(0)
 }
 
 /**
@@ -160,7 +148,7 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
   *
   * @param rootNode
   */
-class TraversableKdTree[V: Distanced : Extrema : Ordering](val rootNode: Option[KdNode[V]] = None)
+class TraversableKdTree[V: Distanced : Extrema : Ordering](override val rootNode: Option[KdNode[V]] = None)
   extends KdTree[V](rootNode = rootNode)
     with Traversable[KdNode[V]] {
 
@@ -210,3 +198,5 @@ class TraversableKdTree[V: Distanced : Extrema : Ordering](val rootNode: Option[
     s"bounds minX: $minX, minY: $minY, maxX: $maxX maxY $maxY"
   }
 }
+
+case class NNResult[V](best: Option[(V, Double)] = None, seen: Set[V] = Set())

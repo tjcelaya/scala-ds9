@@ -6,7 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 /**
   * Created by tj on 3/13/17.
   */
-class RankSpec extends FlatSpec with Matchers  {
+class RankSpec extends FlatSpec with Matchers {
 
   it should "increment rank correctly" in {
     val r0 = new Rank(0)

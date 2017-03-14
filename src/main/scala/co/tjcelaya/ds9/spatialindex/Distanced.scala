@@ -9,5 +9,6 @@ trait Distanced[T] {
 
 trait Extrema[T] {
   def minVal: T
+
   def maxVal: T
 }
