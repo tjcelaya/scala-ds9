@@ -5,5 +5,9 @@ package co.tjcelaya.ds9.common
   */
 case class SplitRange[V: Ordering](lower: V, mid: V, upper: V) {
   val iO = implicitly[Ordering[V]]
-  def contains(other: V): Boolean = iO.compare(lower, other) <= 0 && 0 <= iO.compare(other, upper)
+  def contains(other: V): Boolean = {
+    val lC = iO.gteq(other, lower)
+    val uC = iO.lteq(other, upper)
+    lC && uC
+  }
 }

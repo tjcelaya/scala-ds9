@@ -103,12 +103,11 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
         if (maybeFartherChild.isDefined) {
           val fartherChild = maybeFartherChild.get
           val fartherChildBounds = fartherChild.hyperBounds(path)
-          val checks = fartherChildBounds
-            .zipWithIndex.map({
+          val checks = fartherChildBounds.zipWithIndex.map({
             (splitRangeWithRank: (TypedSplitRange, Int)) =>
-              splitRangeWithRank._1.contains(
-                search(
-                  new Rank(splitRangeWithRank._2)))
+              val searchValueAtRank = search(new Rank(splitRangeWithRank._2))
+              val r = splitRangeWithRank._1.contains(searchValueAtRank)
+              r
           })
 
           val shouldCheck = checks.exists(boo => boo)
@@ -118,10 +117,14 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
             qR(search, depth + 1, path, fartherChild, leafUpdate) match {
               case NNResult(None, _) => nearerUpdate
               case fartherResult @ NNResult(Some((fbN, fbD)), _) =>
-                if (nearerUpdate.best.isDefined && fbD < nearerUpdate.best.get._2)
+
+                val comparedResult = if (nearerUpdate.best.isEmpty
+                  || (nearerUpdate.best.isDefined && fbD < nearerUpdate.best.get._2))
                   fartherResult
                 else
                   nearerUpdate
+
+                comparedResult
             }
           } else {
             nearerUpdate

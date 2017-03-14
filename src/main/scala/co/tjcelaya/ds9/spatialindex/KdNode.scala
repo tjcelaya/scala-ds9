@@ -103,15 +103,12 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
     val iE = implicitly[Extrema[V]]
     val iO = implicitly[Ordering[V]]
 
-    val r = parents.foldLeft[TypedSplitRange](
+    parents.foldLeft[TypedSplitRange](
       TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
     ) {
       (acc: TypedSplitRange, rankedAncestor: TypedKdNode) =>
 
         val parentSplit: V = rankedAncestor.coordinates(rank)
-        val u = acc.upper
-        val m = acc.mid
-        val l = acc.lower
 
         val prevParent = iO.compare(parentSplit, coordinates(rank)) <= 0
 
@@ -119,7 +116,6 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
           if (iO.gt(parentSplit, acc.lower)) {
             acc.copy(lower = parentSplit)
           } else {
-            println(s"$parentSplit was not greater than ${acc.lower}")
             acc
           }
         } else {
@@ -129,16 +125,7 @@ abstract class KdNode[V: Distanced : Extrema : Ordering] {
             acc
           }
         }
-
-
-      //        acc.copy(
-      //          lower = if (swapLower)
-      //            rankedAncestor.coordinates(rank) else acc.lower,
-      //          upper = if (swapUpper)
-      //            rankedAncestor.coordinates(rank) else acc.lower)
     }
-
-    r
   }
 
   def hyperBounds(parents: Seq[TypedKdNode]): Seq[TypedSplitRange] = {
