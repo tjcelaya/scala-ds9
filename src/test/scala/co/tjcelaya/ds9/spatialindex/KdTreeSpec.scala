@@ -1,6 +1,5 @@
 package co.tjcelaya.ds9.spatialindex
 
-import co.tjcelaya.ds9.common.Rank
 import co.tjcelaya.ds9.spatialindex.exceptions.DuplicateCoordinateException
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -126,21 +125,43 @@ class KdTreeSpec extends FlatSpec with Matchers {
   // generate a grid to thoroughly test ideal point selection
 //    Range(1, 10)
 //      .flatMap(x => Range(1, 10).map(y => C(x, y)))
-  //     Seq(C(3, 5), C(4, 2), C(5, 2), C(6, 3), C(6, 6), C(7, 1), C(7, 5), C(7, 9), C(8, 3))
-  Seq(
-    minSearch
-    ,
-    maxSearch
-    ,
-    anotherSearch
-    ,
-    weirderSearch
-  )
+       Seq(
+         C(1,7)
+//         C(1,8),
+//         C(1,9),
+//         C(2,6),
+//         C(2,7),
+//         C(2,8),
+//         C(2,9),
+//         C(3,5),
+//         C(4,2),
+//         C(5,2),
+//         C(6,3),
+//         C(6,6),
+//         C(7,1),
+//         C(7,4),
+//         C(7,5),
+//         C(7,9),
+//         C(8,2),
+//         C(8,4),
+//         C(9,4)
+       )
     .foreach { (c: C) =>
       val (ideal, _) = points.zip(points.map(_.distance(c))).minBy(_._2)
       it should s"find the correct nearest for $c (which should be $ideal)" in {
+
+        if (c == anotherSearch || c == weirderSearch) {
+          KdTree.debug = true
+        }
+
         val res = t.query(c).coordinates
+
+        if (res != ideal) {
+          println(s"seaerching for $c")
+        }
+
         res shouldEqual ideal
+
       }
     }
 

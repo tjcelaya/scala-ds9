@@ -11,6 +11,8 @@ import scala.language.implicitConversions
 object KdTree {
   def apply[V: Distanced : Extrema : Ordering](): KdTree[V] = new KdTree(None)
 
+  var debug = false
+
   implicit def toTraversable[V: Distanced : Extrema : Ordering](kdTree: KdTree[V]): TraversableKdTree[V] = new
       TraversableKdTree(kdTree)
 }
@@ -59,13 +61,14 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
 
     def qR(search: TypedCoordinate,
            depth: Int,
-           maybeParent: Option[TypedNode],
+           parents: Seq[TypedNode],
            node: TypedNode,
            champ: NNResult[TypedNode]): NNResult[TypedNode] = {
       val (axisRank: Rank, cmp: Number) = node.compareOnAxis(search, depth)
       val coords = node.coordinates
       val tD = node.coordinates.distance(search)
       val aaD = Math.abs(cmp.doubleValue)
+      val path = parents :+ node
 
       val leafUpdate =
         if (node.isInstanceOf[LeafKdNode[_]]) {
@@ -78,22 +81,48 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
 
       val nearerUpdate =
         if (preferPrev && node.maybePrev.isDefined) {
-          qR(search, depth + 1, Some(node), node.maybePrev.get, leafUpdate)
+          qR(search, depth + 1, path, node.maybePrev.get, leafUpdate)
         } else if (!preferPrev && node.maybeNext.isDefined) {
-          qR(search, depth + 1, Some(node), node.maybeNext.get, leafUpdate)
+          qR(search, depth + 1, path, node.maybeNext.get, leafUpdate)
         } else {
           leafUpdate
         }
 
-      val hb = node.hyperBounds(maybeParent)
-      val shouldCheckFurther = false
+      val hb = node.hyperBounds(parents)
 
-      val furtherUpdate =
-        if (shouldCheckFurther) {
-          if (preferPrev && node.maybeNext.isDefined) {
-            qR(search, depth + 1, Some(node), node.maybeNext.get, leafUpdate)
-          } else if (!preferPrev && node.maybePrev.isDefined) {
-            qR(search, depth + 1, Some(node), node.maybePrev.get, leafUpdate)
+      val maybeFartherChild: Option[KdNode[V]] =
+        if (preferPrev && node.maybeNext.isDefined) {
+          node.maybeNext
+        } else if (!preferPrev && node.maybePrev.isDefined) {
+          node.maybePrev
+        } else {
+          None
+        }
+
+      val fartherUpdate =
+        if (maybeFartherChild.isDefined) {
+          val fartherChild = maybeFartherChild.get
+          val fartherChildBounds = fartherChild.hyperBounds(path)
+          val checks = fartherChildBounds
+            .zipWithIndex.map({
+            (splitRangeWithRank: (TypedSplitRange, Int)) =>
+              splitRangeWithRank._1.contains(
+                search(
+                  new Rank(splitRangeWithRank._2)))
+          })
+
+          val shouldCheck = checks.exists(boo => boo)
+
+
+          if (shouldCheck) {
+            qR(search, depth + 1, path, fartherChild, leafUpdate) match {
+              case NNResult(None, _) => nearerUpdate
+              case fartherResult @ NNResult(Some((fbN, fbD)), _) =>
+                if (nearerUpdate.best.isDefined && fbD < nearerUpdate.best.get._2)
+                  fartherResult
+                else
+                  nearerUpdate
+            }
           } else {
             nearerUpdate
           }
@@ -101,10 +130,12 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
           nearerUpdate
         }
 
-      val seenUpdate = furtherUpdate.copy(seen = furtherUpdate.seen + node)
+      val seenUpdate = fartherUpdate.copy(seen = fartherUpdate.seen + node)
 
       val fallbackUpdate =
-        if (seenUpdate.best.isEmpty) {
+        if (seenUpdate.best.isEmpty ||
+          (seenUpdate.best.isDefined && tD < seenUpdate.best.get._2)
+        ) {
           seenUpdate.copy(best = Some((node, tD)))
         } else {
           seenUpdate
@@ -114,8 +145,7 @@ class KdTree[V: Distanced : Extrema : Ordering](rootNode: Option[KdNode[V]] = No
       fallbackUpdate
     }
 
-    val r = qR(from, 0, None, rootNode.get, emptyChamp).best
-    if (r.isEmpty) null else r.get._1
+    qR(from, 0, Seq(), rootNode.get, emptyChamp).best.get._1
   }
 
   def toStringPadded: String = rootNode.get.toStringPadded(0)

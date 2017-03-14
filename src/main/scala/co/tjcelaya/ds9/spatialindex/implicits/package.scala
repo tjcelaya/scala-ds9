@@ -17,8 +17,6 @@ package object implicits {
     override def maxVal: Int = Int.MaxValue
   }
 
-  implicit object IntOrdering extends Ordering[Int] {
-    override def compare(x: Int, y: Int): Int = x - y
-  }
+  implicit object IntOrdering extends Ordering.IntOrdering
 
 }

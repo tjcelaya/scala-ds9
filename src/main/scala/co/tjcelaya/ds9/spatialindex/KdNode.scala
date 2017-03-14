@@ -7,12 +7,13 @@ import co.tjcelaya.ds9.spatialindex.exceptions.{DuplicateCoordinateException, In
   * Created by tj on 3/7/17.
   */
 
-abstract class KdNode[V: Distanced : Extrema: Ordering] {
+abstract class KdNode[V: Distanced : Extrema : Ordering] {
   type TypedKdNode = KdNode[V]
   type TypedCoordinate = Coordinate[V]
   type TypedSplitRange = SplitRange[V]
   val TypedSplitRange = SplitRange
   val coordinates: TypedCoordinate
+  val rank: Rank
 
   def maybePrev: Option[TypedKdNode] = this match {
     case LesserKdNode(_, _, p) => Some(p)
@@ -97,28 +98,52 @@ abstract class KdNode[V: Distanced : Extrema: Ordering] {
     }).split("\n").mkString((" " * (1 + depth)) + "\n")
   }
 
-  def dimensionBounds(maybeParent: Option[TypedKdNode], rank: Rank): TypedSplitRange = {
+  def dimensionBounds(parents: Seq[TypedKdNode], rank: Rank): TypedSplitRange = {
     val iD = implicitly[Distanced[V]]
     val iE = implicitly[Extrema[V]]
     val iO = implicitly[Ordering[V]]
-    maybeParent match {
-      case None =>
-        TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
-      case Some(parent) =>
-        val parentRank = rank.decrement(this.coordinates.rank)
-        val cmpToParent = iD.distance(coordinates(parentRank), parent.coordinates(parentRank))
 
-        rank.decrement(coordinates.rank)
+    val r = parents.foldLeft[TypedSplitRange](
+      TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
+    ) {
+      (acc: TypedSplitRange, rankedAncestor: TypedKdNode) =>
 
-        TypedSplitRange(iE.minVal, coordinates(rank), iE.maxVal)
-      case _ =>
-        throw new Exception()
+        val parentSplit: V = rankedAncestor.coordinates(rank)
+        val u = acc.upper
+        val m = acc.mid
+        val l = acc.lower
+
+        val prevParent = iO.compare(parentSplit, coordinates(rank)) <= 0
+
+        if (prevParent) {
+          if (iO.gt(parentSplit, acc.lower)) {
+            acc.copy(lower = parentSplit)
+          } else {
+            println(s"$parentSplit was not greater than ${acc.lower}")
+            acc
+          }
+        } else {
+          if (iO.lt(parentSplit, acc.upper)) {
+            acc.copy(upper = parentSplit)
+          } else {
+            acc
+          }
+        }
+
+
+      //        acc.copy(
+      //          lower = if (swapLower)
+      //            rankedAncestor.coordinates(rank) else acc.lower,
+      //          upper = if (swapUpper)
+      //            rankedAncestor.coordinates(rank) else acc.lower)
     }
+
+    r
   }
 
-  def hyperBounds(parent: Option[TypedKdNode]): Seq[TypedSplitRange] = {
-    val bs = (0 to coordinates.rank.v).map((r: Int) => {
-      dimensionBounds(parent, new Rank(r))
+  def hyperBounds(parents: Seq[TypedKdNode]): Seq[TypedSplitRange] = {
+    val bs = (0 until coordinates.rank.v).map((r: Int) => {
+      dimensionBounds(parents, new Rank(r))
     })
 
     bs
@@ -126,21 +151,21 @@ abstract class KdNode[V: Distanced : Extrema: Ordering] {
 }
 
 case class LeafKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
-                                              rank: Rank)
+                                                         rank: Rank)
   extends KdNode[V]
 
 case class LesserKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
-                                                rank: Rank,
-                                                prev: KdNode[V])
+                                                           rank: Rank,
+                                                           prev: KdNode[V])
   extends KdNode[V]
 
 case class GreaterKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
-                                                 rank: Rank,
-                                                 next: KdNode[V])
+                                                            rank: Rank,
+                                                            next: KdNode[V])
   extends KdNode[V]
 
 case class BalancedKdNode[V: Distanced : Extrema : Ordering](coordinates: Coordinate[V],
-                                                  rank: Rank,
-                                                  prev: KdNode[V],
-                                                  next: KdNode[V])
+                                                             rank: Rank,
+                                                             prev: KdNode[V],
+                                                             next: KdNode[V])
   extends KdNode[V]
