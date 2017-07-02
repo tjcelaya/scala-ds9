@@ -1,4 +1,4 @@
-package co.tjcelaya.ds9.spatialindex
+package co.tjcelaya.ds9.spatial
 
 import co.tjcelaya.ds9.common.Rank
 

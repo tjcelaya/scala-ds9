@@ -1,4 +1,4 @@
-package co.tjcelaya.ds9.spatialindex
+package co.tjcelaya.ds9.spatial
 
 /**
   * Created by tj on 3/8/17.

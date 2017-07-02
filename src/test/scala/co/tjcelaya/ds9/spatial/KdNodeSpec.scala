@@ -1,4 +1,4 @@
-package co.tjcelaya.ds9.spatialindex
+package co.tjcelaya.ds9.spatial
 
 import co.tjcelaya.ds9.common.Rank
 import org.scalatest.{FlatSpec, Matchers}
@@ -8,7 +8,7 @@ import org.scalatest.{FlatSpec, Matchers}
   */
 class KdNodeSpec extends FlatSpec with Matchers {
 
-  import co.tjcelaya.ds9.spatialindex.implicits._
+  import co.tjcelaya.ds9.spatial.implicits._
 
   type C = SeqCoordinate[Int]
   val C = SeqCoordinate // object equivalent of `type C = SeqCoordinate`

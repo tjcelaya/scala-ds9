@@ -1,7 +1,7 @@
-package co.tjcelaya.ds9.spatialindex
+package co.tjcelaya.ds9.spatial
 
 import co.tjcelaya.ds9.common.{Rank, SplitRange}
-import co.tjcelaya.ds9.spatialindex.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException}
+import co.tjcelaya.ds9.spatial.exceptions.{DuplicateCoordinateException, InvalidKdDropException, InvalidKdSetException}
 
 /**
   * Created by tj on 3/7/17.

@@ -1,11 +1,11 @@
-package co.tjcelaya.ds9.spatialindex
+package co.tjcelaya.ds9.spatial
 
-import co.tjcelaya.ds9.spatialindex.exceptions.DuplicateCoordinateException
+import co.tjcelaya.ds9.spatial.exceptions.DuplicateCoordinateException
 import org.scalatest.{FlatSpec, Matchers}
 
 class KdTreeSpec extends FlatSpec with Matchers {
 
-  import co.tjcelaya.ds9.spatialindex.implicits._
+  import co.tjcelaya.ds9.spatial.implicits._
 
   type C = SeqCoordinate[Int]
   val C = SeqCoordinate // object equivalent of `type C = SeqCoordinate`
