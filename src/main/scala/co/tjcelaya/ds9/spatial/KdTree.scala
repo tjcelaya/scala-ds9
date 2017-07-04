@@ -1,6 +1,6 @@
 package co.tjcelaya.ds9.spatial
 
-import co.tjcelaya.ds9.common.{Rank, SplitRange}
+import co.tjcelaya.ds9.common.{Distanced, Rank, SplitRange}
 import co.tjcelaya.ds9.spatial.exceptions._
 
 import scala.language.implicitConversions

@@ -1,5 +1,7 @@
 package co.tjcelaya.ds9.spatial
 
+import co.tjcelaya.ds9.common.Distanced
+
 /**
   * Created by tj on 3/8/17.
   */

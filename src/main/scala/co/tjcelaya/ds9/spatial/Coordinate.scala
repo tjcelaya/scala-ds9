@@ -1,6 +1,6 @@
 package co.tjcelaya.ds9.spatial
 
-import co.tjcelaya.ds9.common.Rank
+import co.tjcelaya.ds9.common.{Distanced, Rank}
 
 /**
   * Created by tj on 3/7/17.
